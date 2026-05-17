@@ -1,0 +1,159 @@
+[
+  {
+    "name": "example.com (simple HTML)",
+    "url": "https://example.com",
+    "expect": {
+      "exit": 0,
+      "contentTypeIncludes": "text/html",
+      "hasTitle": true,
+      "bodyIncludes": "documentation examples",
+      "bodyExcludes": "<html"
+    }
+  },
+  {
+    "name": "GitHub README (HTML)",
+    "url": "https://github.com/kepano/defuddle",
+    "expect": {
+      "exit": 0,
+      "contentTypeIncludes": "text/html",
+      "hasTitle": true,
+      "bodyIncludes": "Defuddle"
+    }
+  },
+  {
+    "name": "raw markdown file",
+    "url": "https://raw.githubusercontent.com/kepano/defuddle/main/README.md",
+    "expect": {
+      "exit": 0,
+      "contentTypeIncludes": "text/plain",
+      "bodyIncludes": "defuddle"
+    }
+  },
+  {
+    "name": "JSON API",
+    "url": "https://api.github.com/repos/kepano/defuddle",
+    "expect": {
+      "exit": 0,
+      "contentTypeIncludes": "json",
+      "bodyIncludes": "\"full_name\""
+    }
+  },
+  {
+    "name": "plain text robots.txt",
+    "url": "https://www.google.com/robots.txt",
+    "expect": {
+      "exit": 0,
+      "contentTypeIncludes": "text/plain",
+      "bodyIncludes": "User-agent"
+    }
+  },
+  {
+    "name": "redirect (http -> https example.com)",
+    "url": "http://example.com",
+    "expect": {
+      "exit": 0,
+      "bodyIncludes": "documentation examples"
+    }
+  },
+  {
+    "name": "missing page (404)",
+    "url": "https://example.com/this-page-does-not-exist-abcdef",
+    "expect": {
+      "exit": "nonzero"
+    }
+  },
+  {
+    "name": "invalid host (network failure)",
+    "url": "https://this-host-does-not-exist-zzzzzzzz.example",
+    "expect": {
+      "exit": "nonzero"
+    }
+  },
+  {
+    "name": "PDF binary",
+    "url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+    "expect": {
+      "exit": 0,
+      "contentTypeIncludes": "pdf",
+      "isBinaryNotice": true
+    }
+  },
+  {
+    "name": "PNG image",
+    "url": "https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png",
+    "expect": {
+      "exit": 0,
+      "contentTypeIncludes": "image/png",
+      "isBinaryNotice": true
+    }
+  },
+  {
+    "name": "MP3 audio",
+    "url": "https://download.samplelib.com/mp3/sample-3s.mp3",
+    "expect": {
+      "exit": 0,
+      "contentTypeIncludes": "audio",
+      "isBinaryNotice": true
+    }
+  },
+  {
+    "name": "noisy docs page (MDN)",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Introduction",
+    "expect": {
+      "exit": 0,
+      "contentTypeIncludes": "text/html",
+      "hasTitle": true,
+      "bodyIncludes": "JavaScript"
+    }
+  },
+  {
+    "name": "Wikipedia article",
+    "url": "https://en.wikipedia.org/wiki/Markdown",
+    "expect": {
+      "exit": 0,
+      "contentTypeIncludes": "text/html",
+      "hasTitle": true,
+      "bodyIncludes": "Markdown"
+    }
+  },
+  {
+    "name": "Hacker News front page",
+    "url": "https://news.ycombinator.com/",
+    "expect": {
+      "exit": 0,
+      "contentTypeIncludes": "text/html",
+      "hasTitle": true
+    }
+  },
+  {
+    "name": "raw JSON via httpbin",
+    "url": "https://httpbin.org/json",
+    "expect": {
+      "exit": 0,
+      "contentTypeIncludes": "json",
+      "bodyIncludes": "slideshow"
+    }
+  },
+  {
+    "name": "httpbin redirect 3 hops",
+    "url": "https://httpbin.org/redirect/3",
+    "expect": {
+      "exit": 0,
+      "bodyIncludes": "url"
+    }
+  },
+  {
+    "name": "httpbin 500",
+    "url": "https://httpbin.org/status/500",
+    "expect": { "exit": "nonzero" }
+  },
+  {
+    "name": "httpbin xml",
+    "url": "https://httpbin.org/xml",
+    "expect": {
+      "exit": 0,
+      "contentTypeIncludes": "xml",
+      "bodyIncludes": "<slideshow"
+    }
+  }
+]

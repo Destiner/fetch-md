@@ -1,0 +1,38 @@
+{
+  "name": "fetch-md",
+  "version": "0.1.0",
+  "description": "Small local CLI that fetches a URL and prints agent-friendly markdown.",
+  "license": "MIT",
+  "author": "Timur Badretdinov",
+  "type": "module",
+  "bin": {
+    "fetch-md": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "build": "bun run build.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "bun run build.ts && bun run test/run.ts test/cases.json"
+  },
+  "keywords": [
+    "fetch",
+    "markdown",
+    "cli",
+    "defuddle",
+    "turndown",
+    "agent"
+  ],
+  "dependencies": {
+    "defuddle": "^0.18.1",
+    "jsdom": "^29.1.1",
+    "turndown": "^7.2.4"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/jsdom": "^28.0.3",
+    "@types/turndown": "^5.0.6"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
