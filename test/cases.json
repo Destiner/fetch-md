@@ -53,7 +53,7 @@
     "url": "https://example.com/this-page-does-not-exist-abcdef",
     "expect": {
       "exit": "nonzero",
-      "stderrIncludes": "HTTP 404"
+      "bodyIncludes": "HTTP_ERROR"
     }
   },
   {
@@ -61,7 +61,7 @@
     "url": "https://this-host-does-not-exist-zzzzzzzz.example",
     "expect": {
       "exit": "nonzero",
-      "stderrIncludes": "fetch failed"
+      "bodyIncludes": "FETCH_FAILED"
     }
   },
   {
@@ -131,7 +131,7 @@
   {
     "name": "httpbin 500",
     "url": "https://httpbin.org/status/500",
-    "expect": { "exit": "nonzero", "stderrIncludes": "HTTP 500" }
+    "expect": { "exit": "nonzero", "bodyIncludes": "HTTP_ERROR" }
   },
   {
     "name": "httpbin xml",

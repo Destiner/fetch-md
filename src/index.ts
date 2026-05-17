@@ -1,11 +1,10 @@
 #!/usr/bin/env bun
+import { Cli, z } from 'incur'
 import { Defuddle } from 'defuddle/node'
 import { JSDOM } from 'jsdom'
 import TurndownService from 'turndown'
 
-const USER_AGENT = 'fetch-md/0.1 (+local CLI; treats content as untrusted)'
-const DEFAULT_MAX_BYTES = 5_000_000
-const DEFAULT_TIMEOUT_MS = 15_000
+const USER_AGENT = 'fetch-md/0.2 (+local CLI; treats content as untrusted)'
 
 type FetchResult = {
   body: Uint8Array
@@ -16,9 +15,9 @@ type FetchResult = {
   truncated: boolean
 }
 
-async function fetchUrl(url: string): Promise<FetchResult> {
+async function fetchUrl(url: string, timeoutMs: number, maxBytes: number): Promise<FetchResult> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
     const res = await fetch(url, {
       redirect: 'follow',
@@ -40,7 +39,7 @@ async function fetchUrl(url: string): Promise<FetchResult> {
         if (done) break
         if (value) {
           total += value.byteLength
-          if (total > DEFAULT_MAX_BYTES) {
+          if (total > maxBytes) {
             truncated = true
             try {
               await reader.cancel()
@@ -75,7 +74,6 @@ function isHtml(contentType: string, body: Uint8Array): boolean {
   const ct = contentType.toLowerCase()
   if (ct.includes('text/html') || ct.includes('application/xhtml')) return true
   if (ct && !ct.includes('html')) return false
-  // Fallback: sniff first bytes for an HTML signature when content-type is missing or ambiguous.
   const head = new TextDecoder('utf-8', { fatal: false })
     .decode(body.subarray(0, 512))
     .trimStart()
@@ -100,7 +98,6 @@ function isTextLike(contentType: string, body: Uint8Array): boolean {
     return true
   }
   if (ct && ct.length > 0) return false
-  // Sniff: if there are no NUL bytes in the first 4KB, treat as text.
   const sample = body.subarray(0, Math.min(body.byteLength, 4096))
   for (const b of sample) {
     if (b === 0) return false
@@ -108,7 +105,7 @@ function isTextLike(contentType: string, body: Uint8Array): boolean {
   return sample.length > 0
 }
 
-async function extractMarkdown(html: string, url: string): Promise<{ title: string; markdown: string }> {
+async function extractMarkdown(html: string, url: string): Promise<string> {
   const dom = new JSDOM(html, { url })
   const result = await Defuddle(dom as unknown as { window: { document: Document; location: { href: string } } }, url, {
     markdown: false,
@@ -121,75 +118,81 @@ async function extractMarkdown(html: string, url: string): Promise<{ title: stri
     linkStyle: 'inlined',
   })
   turndown.remove(['script', 'style', 'noscript', 'iframe'] as Array<keyof HTMLElementTagNameMap>)
-  const markdown = turndown.turndown(result.content || '').trim()
-  return { title: result.title || '', markdown }
+  return turndown.turndown(result.content || '').trim()
 }
 
-function logError(msg: string): void {
-  process.stderr.write(`fetch-md: ${msg}\n`)
-}
-
-async function main(): Promise<number> {
-  const argv = process.argv.slice(2)
-  const first = argv[0]
-  if (first === undefined || first === '-h' || first === '--help') {
-    process.stderr.write('usage: fetch-md <url>\n')
-    return first === undefined ? 2 : 0
-  }
-  if (first === '--version' || first === '-V') {
-    process.stdout.write('fetch-md 0.1.0\n')
-    return 0
-  }
-
-  const url = first
-  let parsed: URL
-  try {
-    parsed = new URL(url)
-  } catch {
-    logError(`invalid URL: ${url}`)
-    return 2
-  }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    logError(`unsupported protocol: ${parsed.protocol}`)
-    return 2
-  }
-
-  let fetched: FetchResult
-  try {
-    fetched = await fetchUrl(url)
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    logError(`fetch failed: ${msg}`)
-    return 1
-  }
-
-  let body = ''
-  if (isHtml(fetched.contentType, fetched.body)) {
-    const html = new TextDecoder('utf-8', { fatal: false }).decode(fetched.body)
+Cli.create('fetch-md', {
+  version: '0.2.0',
+  description: 'Fetch a URL and print it as markdown. HTML is cleaned and converted; text-like responses pass through; binary responses are reported as a placeholder.',
+  args: z.object({
+    url: z.string().describe('URL to fetch (http or https)'),
+  }),
+  options: z.object({
+    timeoutMs: z.coerce.number().int().positive().default(15_000).describe('Request timeout in milliseconds'),
+    maxBytes: z.coerce.number().int().positive().default(5_000_000).describe('Maximum response body size in bytes'),
+  }),
+  examples: [
+    { args: { url: 'https://example.com' }, description: 'Fetch a page' },
+    { args: { url: 'https://raw.githubusercontent.com/kepano/defuddle/main/README.md' }, description: 'Plain text passthrough' },
+    {
+      args: { url: 'https://example.com' },
+      options: { timeoutMs: 30_000, maxBytes: 10_000_000 },
+      description: 'Larger timeout and cap',
+    },
+  ],
+  async run(c) {
+    const { url } = c.args
+    let parsed: URL
     try {
-      body = (await extractMarkdown(html, fetched.finalUrl)).markdown
-    } catch (err) {
-      logError(`extraction failed: ${err instanceof Error ? err.message : String(err)}; emitting raw HTML`)
-      body = html
+      parsed = new URL(url)
+    } catch {
+      return c.error({ code: 'INVALID_URL', message: `invalid URL: ${url}`, retryable: false })
     }
-  } else if (isTextLike(fetched.contentType, fetched.body)) {
-    body = new TextDecoder('utf-8', { fatal: false }).decode(fetched.body)
-  } else {
-    body = `[binary body omitted: ${fetched.body.byteLength} bytes]`
-  }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return c.error({
+        code: 'UNSUPPORTED_PROTOCOL',
+        message: `unsupported protocol: ${parsed.protocol} (only http/https supported)`,
+        retryable: false,
+      })
+    }
 
-  if (fetched.truncated) logError(`response exceeded ${DEFAULT_MAX_BYTES} bytes; body truncated`)
-  if (fetched.status >= 400) logError(`HTTP ${fetched.status} ${fetched.statusText}`)
+    let fetched: FetchResult
+    try {
+      fetched = await fetchUrl(url, c.options.timeoutMs, c.options.maxBytes)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      return c.error({ code: 'FETCH_FAILED', message: `fetch failed: ${msg}`, retryable: true })
+    }
 
-  process.stdout.write(body)
-  if (!body.endsWith('\n')) process.stdout.write('\n')
+    let body = ''
+    if (isHtml(fetched.contentType, fetched.body)) {
+      const html = new TextDecoder('utf-8', { fatal: false }).decode(fetched.body)
+      try {
+        body = await extractMarkdown(html, fetched.finalUrl)
+      } catch (err) {
+        process.stderr.write(
+          `fetch-md: extraction failed: ${err instanceof Error ? err.message : String(err)}; emitting raw HTML\n`,
+        )
+        body = html
+      }
+    } else if (isTextLike(fetched.contentType, fetched.body)) {
+      body = new TextDecoder('utf-8', { fatal: false }).decode(fetched.body)
+    } else {
+      body = `[binary body omitted: ${fetched.body.byteLength} bytes]`
+    }
 
-  return fetched.status >= 400 ? 1 : 0
-}
+    if (fetched.truncated) {
+      process.stderr.write(`fetch-md: response exceeded ${c.options.maxBytes} bytes; body truncated\n`)
+    }
 
-main()
-  .then((code) => process.exit(code))
-  .catch((err) => {
-    logError(err instanceof Error ? err.stack || err.message : String(err))
-    process.exit(1)
-  })
+    if (fetched.status >= 400) {
+      return c.error({
+        code: 'HTTP_ERROR',
+        message: `HTTP ${fetched.status} ${fetched.statusText}`,
+        retryable: fetched.status >= 500,
+      })
+    }
+
+    return body
+  },
+}).serve()

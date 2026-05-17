@@ -24,6 +24,7 @@
   ],
   "dependencies": {
     "defuddle": "^0.18.1",
+    "incur": "^0.4.6",
     "jsdom": "^29.1.1",
     "turndown": "^7.2.4"
   },
