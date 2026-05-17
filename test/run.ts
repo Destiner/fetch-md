@@ -3,13 +3,10 @@ import { spawn } from 'bun'
 
 type Expect = {
   exit?: number | 'nonzero'
-  contentTypeIncludes?: string
   bodyIncludes?: string
   bodyExcludes?: string
-  hasTitle?: boolean
   isBinaryNotice?: boolean
-  truncated?: boolean
-  maxBytes?: number
+  stderrIncludes?: string
 }
 
 type Case = {
@@ -19,7 +16,6 @@ type Case = {
 }
 
 const BINARY_NOTICE = '[binary body omitted'
-const HEADER_PREFIX = 'UNTRUSTED FETCHED CONTENT'
 
 async function run(url: string): Promise<{ code: number; stdout: string; stderr: string }> {
   const proc = spawn({
@@ -32,18 +28,10 @@ async function run(url: string): Promise<{ code: number; stdout: string; stderr:
   return { code, stdout, stderr }
 }
 
-function splitOutput(stdout: string): { header: string; body: string } {
-  const sep = '\n---\n'
-  const idx = stdout.indexOf(sep)
-  if (idx === -1) return { header: stdout, body: '' }
-  return { header: stdout.slice(0, idx), body: stdout.slice(idx + sep.length).trimStart() }
-}
-
 function check(c: Case, out: { code: number; stdout: string; stderr: string }): string[] {
   const errors: string[] = []
-  const { code, stdout } = out
-  if (stdout.length > 0 && !stdout.startsWith(HEADER_PREFIX)) errors.push('missing UNTRUSTED header')
-  const { header, body } = splitOutput(stdout)
+  const { code, stdout, stderr } = out
+  const body = stdout
 
   if (c.expect.exit === 'nonzero') {
     if (code === 0) errors.push(`expected nonzero exit, got 0`)
@@ -53,15 +41,6 @@ function check(c: Case, out: { code: number; stdout: string; stderr: string }): 
     errors.push(`unexpected nonzero exit ${code}`)
   }
 
-  if (c.expect.contentTypeIncludes) {
-    const match = header.split('\n').find((l) => l.startsWith('Content-Type:'))
-    if (!match || !match.toLowerCase().includes(c.expect.contentTypeIncludes.toLowerCase())) {
-      errors.push(`Content-Type missing "${c.expect.contentTypeIncludes}" (got: ${match ?? 'none'})`)
-    }
-  }
-  if (c.expect.hasTitle) {
-    if (!header.split('\n').some((l) => l.startsWith('Title:'))) errors.push('missing Title header')
-  }
   if (c.expect.bodyIncludes && !body.includes(c.expect.bodyIncludes)) {
     errors.push(`body missing "${c.expect.bodyIncludes}"`)
   }
@@ -71,8 +50,8 @@ function check(c: Case, out: { code: number; stdout: string; stderr: string }): 
   if (c.expect.isBinaryNotice) {
     if (!body.startsWith(BINARY_NOTICE)) errors.push('expected binary notice')
   }
-  if (c.expect.truncated) {
-    if (!header.includes('Truncated:')) errors.push('expected Truncated marker')
+  if (c.expect.stderrIncludes && !stderr.includes(c.expect.stderrIncludes)) {
+    errors.push(`stderr missing "${c.expect.stderrIncludes}"`)
   }
   return errors
 }
@@ -86,7 +65,7 @@ let fail = 0
 const failures: Array<{ name: string; url: string; errors: string[]; stderr: string }> = []
 const startedAt = Date.now()
 
-async function worker(id: number) {
+async function worker(_id: number) {
   while (queue.length > 0) {
     const c = queue.shift()
     if (!c) return

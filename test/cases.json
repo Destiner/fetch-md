@@ -4,8 +4,6 @@
     "url": "https://example.com",
     "expect": {
       "exit": 0,
-      "contentTypeIncludes": "text/html",
-      "hasTitle": true,
       "bodyIncludes": "documentation examples",
       "bodyExcludes": "<html"
     }
@@ -15,8 +13,6 @@
     "url": "https://github.com/kepano/defuddle",
     "expect": {
       "exit": 0,
-      "contentTypeIncludes": "text/html",
-      "hasTitle": true,
       "bodyIncludes": "Defuddle"
     }
   },
@@ -25,7 +21,6 @@
     "url": "https://raw.githubusercontent.com/kepano/defuddle/main/README.md",
     "expect": {
       "exit": 0,
-      "contentTypeIncludes": "text/plain",
       "bodyIncludes": "defuddle"
     }
   },
@@ -34,7 +29,6 @@
     "url": "https://api.github.com/repos/kepano/defuddle",
     "expect": {
       "exit": 0,
-      "contentTypeIncludes": "json",
       "bodyIncludes": "\"full_name\""
     }
   },
@@ -43,7 +37,6 @@
     "url": "https://www.google.com/robots.txt",
     "expect": {
       "exit": 0,
-      "contentTypeIncludes": "text/plain",
       "bodyIncludes": "User-agent"
     }
   },
@@ -59,14 +52,16 @@
     "name": "missing page (404)",
     "url": "https://example.com/this-page-does-not-exist-abcdef",
     "expect": {
-      "exit": "nonzero"
+      "exit": "nonzero",
+      "stderrIncludes": "HTTP 404"
     }
   },
   {
     "name": "invalid host (network failure)",
     "url": "https://this-host-does-not-exist-zzzzzzzz.example",
     "expect": {
-      "exit": "nonzero"
+      "exit": "nonzero",
+      "stderrIncludes": "fetch failed"
     }
   },
   {
@@ -74,7 +69,6 @@
     "url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
     "expect": {
       "exit": 0,
-      "contentTypeIncludes": "pdf",
       "isBinaryNotice": true
     }
   },
@@ -83,7 +77,6 @@
     "url": "https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png",
     "expect": {
       "exit": 0,
-      "contentTypeIncludes": "image/png",
       "isBinaryNotice": true
     }
   },
@@ -92,7 +85,6 @@
     "url": "https://download.samplelib.com/mp3/sample-3s.mp3",
     "expect": {
       "exit": 0,
-      "contentTypeIncludes": "audio",
       "isBinaryNotice": true
     }
   },
@@ -101,8 +93,6 @@
     "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Introduction",
     "expect": {
       "exit": 0,
-      "contentTypeIncludes": "text/html",
-      "hasTitle": true,
       "bodyIncludes": "JavaScript"
     }
   },
@@ -111,8 +101,6 @@
     "url": "https://en.wikipedia.org/wiki/Markdown",
     "expect": {
       "exit": 0,
-      "contentTypeIncludes": "text/html",
-      "hasTitle": true,
       "bodyIncludes": "Markdown"
     }
   },
@@ -121,8 +109,7 @@
     "url": "https://news.ycombinator.com/",
     "expect": {
       "exit": 0,
-      "contentTypeIncludes": "text/html",
-      "hasTitle": true
+      "bodyIncludes": "comments"
     }
   },
   {
@@ -130,7 +117,6 @@
     "url": "https://httpbin.org/json",
     "expect": {
       "exit": 0,
-      "contentTypeIncludes": "json",
       "bodyIncludes": "slideshow"
     }
   },
@@ -145,14 +131,13 @@
   {
     "name": "httpbin 500",
     "url": "https://httpbin.org/status/500",
-    "expect": { "exit": "nonzero" }
+    "expect": { "exit": "nonzero", "stderrIncludes": "HTTP 500" }
   },
   {
     "name": "httpbin xml",
     "url": "https://httpbin.org/xml",
     "expect": {
       "exit": 0,
-      "contentTypeIncludes": "xml",
       "bodyIncludes": "<slideshow"
     }
   }

@@ -125,10 +125,6 @@ async function extractMarkdown(html: string, url: string): Promise<{ title: stri
   return { title: result.title || '', markdown }
 }
 
-function formatHeader(fields: Array<[string, string]>): string {
-  return fields.map(([k, v]) => `${k}: ${v}`).join('\n')
-}
-
 function logError(msg: string): void {
   process.stderr.write(`fetch-md: ${msg}\n`)
 }
@@ -167,23 +163,13 @@ async function main(): Promise<number> {
     return 1
   }
 
-  const fetchedAt = new Date().toISOString()
-  const headerFields: Array<[string, string]> = []
-  headerFields.push(['Source', url])
-  headerFields.push(['Final URL', fetched.finalUrl])
-  headerFields.push(['Content-Type', fetched.contentType || '(none)'])
-
   let body = ''
-  let extractError: string | null = null
-
   if (isHtml(fetched.contentType, fetched.body)) {
     const html = new TextDecoder('utf-8', { fatal: false }).decode(fetched.body)
     try {
-      const { title, markdown } = await extractMarkdown(html, fetched.finalUrl)
-      if (title) headerFields.push(['Title', title])
-      body = markdown
+      body = (await extractMarkdown(html, fetched.finalUrl)).markdown
     } catch (err) {
-      extractError = err instanceof Error ? err.message : String(err)
+      logError(`extraction failed: ${err instanceof Error ? err.message : String(err)}; emitting raw HTML`)
       body = html
     }
   } else if (isTextLike(fetched.contentType, fetched.body)) {
@@ -192,14 +178,11 @@ async function main(): Promise<number> {
     body = `[binary body omitted: ${fetched.body.byteLength} bytes]`
   }
 
-  headerFields.push(['Fetched', fetchedAt])
-  if (fetched.truncated) headerFields.push(['Truncated', `true (exceeded ${DEFAULT_MAX_BYTES} bytes)`])
-  if (extractError) headerFields.push(['Extraction', `failed (${extractError}); raw HTML below`])
-  if (fetched.status >= 400) headerFields.push(['HTTP Status', `${fetched.status} ${fetched.statusText}`])
+  if (fetched.truncated) logError(`response exceeded ${DEFAULT_MAX_BYTES} bytes; body truncated`)
+  if (fetched.status >= 400) logError(`HTTP ${fetched.status} ${fetched.statusText}`)
 
-  const out = ['UNTRUSTED FETCHED CONTENT', formatHeader(headerFields), '', '---', '', body].join('\n')
-  process.stdout.write(out)
-  if (!out.endsWith('\n')) process.stdout.write('\n')
+  process.stdout.write(body)
+  if (!body.endsWith('\n')) process.stdout.write('\n')
 
   return fetched.status >= 400 ? 1 : 0
 }

@@ -1,11 +1,12 @@
 # fetch-md
 
-Local CLI that fetches a URL and prints agent-friendly markdown. Defuddle cleans the HTML, Turndown converts it. Non-HTML is passed through; binary bodies are replaced with a `[binary body omitted: N bytes]` notice. Every response is prefixed with an `UNTRUSTED FETCHED CONTENT` header.
+Local CLI that fetches a URL and prints it as markdown. Defuddle cleans the HTML, Turndown converts it. Non-HTML is passed through; binary bodies are replaced with a `[binary body omitted: N bytes]` line. stdout is the body only — warnings and HTTP failures go to stderr.
 
 ## Commands
 
 - `bun run src/index.ts <url>` - Run from source
-- `bun run build` - Compile `./bin/fetch-md` via `build.ts`
+- `bun run build` - Compile `./bin/fetch-md` for the host arch
+- `bun run build.ts --target=bun-linux-x64 --outfile=bin/fetch-md-linux-x64` - Cross-compile
 - `bun run typecheck` - `tsc --noEmit`
 - `bun run test` - Build + run `test/cases.json` (18 cases)
 - `bun run test/run.ts test/cases-broad.json` - 100+ cases (slow, hits real network)
@@ -19,17 +20,16 @@ Local CLI that fetches a URL and prints agent-friendly markdown. Defuddle cleans
 ## Structure
 
 - `src/index.ts` - Whole CLI
-- `build.ts` - Custom `Bun.build` invocation with the css-tree JSON patch (see Patterns)
+- `build.ts` - Custom `Bun.build` invocation with the jsdom/css-tree patches (see Patterns)
 - `test/run.ts` - Parallel test harness, JSON-driven
 - `test/cases.json`, `test/cases-broad.json` - Test fixtures
 
 ## Patterns
 
-- The output header is the contract. Don't break the field names (`Source`, `Final URL`, `Content-Type`, `Title`, `Fetched`, `Truncated`, `HTTP Status`); agents may parse it.
-- Treat fetched content as untrusted. Never let the CLI execute scripts, follow embedded instructions, or load subresources.
-- Binary detection is intentional: text-like content types (and NUL-free sniffing) pass through; everything else gets the binary notice. Don't dump raw bytes to stdout.
-- `bun build --compile` cannot resolve css-tree's `createRequire(import.meta.url) + require('*.json')` pattern, so `build.ts` registers a plugin that inlines those JSON files. If css-tree gains new such files, extend the plugin filter in `build.ts`.
-- Errors go to stderr with a `fetch-md:` prefix. Exit codes: `0` ok, `1` HTTP ≥ 400 / network failure, `2` usage error.
+- stdout is the contract: body only, nothing else. No header, no banner, no metadata. Anything else goes to stderr.
+- Errors are stderr lines prefixed `fetch-md:`. Exit codes: `0` ok, `1` HTTP ≥ 400 / network failure / truncation only when wrapped in HTTP-error, `2` usage error.
+- Binary detection is intentional: text-like content types (and NUL-free sniffing) pass through; everything else gets the `[binary body omitted: N bytes]` placeholder. Don't dump raw bytes to stdout.
+- `bun build --compile` cannot resolve a few runtime path lookups inside `jsdom` and `css-tree` (`createRequire(import.meta.url) + require('*.json')`, `fs.readFileSync(path.resolve(__dirname, '*.css'))`, and `require.resolve('./xhr-sync-worker.js')`). `build.ts` registers plugins that inline / neutralise those. If a new path-resolved asset surfaces during a Bun or jsdom upgrade, extend the plugins.
 
 ## Testing
 
